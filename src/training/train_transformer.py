@@ -15,13 +15,30 @@ def load_config(config_path="configs/config.yaml"):
         return yaml.safe_load(f)
 
 
+def load_or_build_model(config, output_dir):
+    """Load existing model if available, otherwise build a new one."""
+    from transformers import TFBertModel
+
+    for candidate in ["best_model.h5", "interrupted_model.h5", "final_model.h5"]:
+        model_path = output_dir / candidate
+        if model_path.exists():
+            print(f"Resuming from existing model: {model_path}")
+            return tf.keras.models.load_model(
+                str(model_path),
+                custom_objects={"TFBertModel": TFBertModel}
+            )
+
+    print("No existing model found. Building a new model ...")
+    return build_model(config)
+
+
 def train(config):
     X_train, X_val, X_test, y_train, y_val, y_test = build_dataset(config)
 
-    model = build_model(config)
-
     output_dir = Path(config["saved_models"]["transformer"])
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    model = load_or_build_model(config, output_dir)
 
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
@@ -30,21 +47,21 @@ def train(config):
             save_best_only=True,
             verbose=1
         ),
-        tf.keras.callbacks.EarlyStopping(
-            monitor="val_loss",
-            patience=3,
-            restore_best_weights=True,
-            verbose=1
-        ),
     ]
 
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=config["classifier"]["epochs"],
-        batch_size=config["classifier"]["batch_size"],
-        callbacks=callbacks,
-    )
+    try:
+        history = model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=config["classifier"]["epochs"],
+            batch_size=config["classifier"]["batch_size"],
+            callbacks=callbacks,
+        )
+    except KeyboardInterrupt:
+        print("\nTraining interrupted. Saving current model state ...")
+        model.save(str(output_dir / "interrupted_model.h5"))
+        print(f"Model saved to {output_dir / 'interrupted_model.h5'}")
+        return model, None
 
     model.save(str(output_dir / "final_model.h5"))
     print(f"Model saved to {output_dir}")

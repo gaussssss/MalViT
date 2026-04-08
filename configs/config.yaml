@@ -9,8 +9,6 @@ data:
 
 transformer:
   token_bits: 8
-  pad_token_id: 256
-  max_seq_len: 1024
   num_layers: 6
   num_heads: 8
   hidden_size: 512
@@ -19,6 +17,10 @@ classifier:
   epochs: 50
   batch_size: 32
   learning_rate: 0.001
+
+image:
+  contrast_enhancement: true
+  contrast_mode: sigmoid
 
 thresholds:
   block: 0.85

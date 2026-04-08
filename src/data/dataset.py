@@ -39,6 +39,24 @@ def load_sequences(processed_dir, label, max_seq_len, pad_token_id):
     return all_chunks, all_labels
 
 
+def load_sequences_per_file(processed_dir, label, max_seq_len, pad_token_id):
+    """Load all .npy files from a directory and return chunks grouped by file."""
+    processed_dir = Path(processed_dir)
+    files_chunks = []
+    labels = []
+
+    for npy_file in sorted(processed_dir.glob("*.npy")):
+        sequence = np.load(npy_file)
+        if len(sequence) == 0:
+            continue
+        chunks = chunk_sequence(sequence, max_seq_len, pad_token_id)
+        files_chunks.append(chunks)
+        labels.append(label)
+        print(f"  {npy_file.name} -> {len(chunks)} chunk(s)")
+
+    return files_chunks, labels
+
+
 def build_dataset(config, val_size=0.15, test_size=0.15, random_state=42):
     """Load, chunk, and split data into train/val/test sets."""
     max_seq_len = config["transformer"]["max_seq_len"]
